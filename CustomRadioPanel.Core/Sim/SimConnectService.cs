@@ -209,7 +209,7 @@ public sealed class SimConnectService : ISimConnectService
         Add("ADF ACTIVE FREQUENCY:2", "KHz");
         Add("NAV DME:1", "Nautical miles");
         Add("NAV DME:2", "Nautical miles");
-        Add("TRANSPONDER CODE:1", "Number");
+        Add("TRANSPONDER CODE:1", "BCO16"); // binary-coded octal (each nibble = one squawk digit)
         Add("KOHLSMAN SETTING MB", "Millibars");
 
         // swap events

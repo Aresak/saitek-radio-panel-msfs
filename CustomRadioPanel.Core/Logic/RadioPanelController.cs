@@ -24,7 +24,8 @@ public sealed class RadioPanelController : IDisposable
 
     private RadioMode? _topMode;
     private RadioMode? _bottomMode;
-    private readonly Dictionary<PanelRow, long> _buttonDownAt = new();
+    private readonly Dictionary<PanelRow, ITimer> _longPressTimers = new();
+    private readonly HashSet<PanelRow> _longFired = new();
     private volatile bool _welcomeActive;
 
     public RadioPanelController(
@@ -99,6 +100,7 @@ public sealed class RadioPanelController : IDisposable
                 case SelectorChanged sc:
                     if (sc.Row == PanelRow.Top) _topMode = sc.Mode; else _bottomMode = sc.Mode;
                     _accel.Reset();
+                    _log.LogDebug("Selector {Row} -> {Mode}", sc.Row, sc.Mode);
                     RefreshDisplays();
                     break;
 
@@ -107,7 +109,7 @@ public sealed class RadioPanelController : IDisposable
                     break;
 
                 case ActStbyDown down:
-                    _buttonDownAt[down.Row] = _time.GetTimestamp();
+                    StartLongPressTimer(down.Row);
                     break;
 
                 case ActStbyUp up:
@@ -144,21 +146,25 @@ public sealed class RadioPanelController : IDisposable
                 double adf = Clamp(RadioFormat.SnapToGrid(snap.Adf1 + adfStep, 1), 190, 1799);
                 snap.Adf1 = adf;
                 _sim.SetAdfKHz(1, adf);
+                _log.LogDebug("Tune ADF1 {Knob} dir {Dir} x{Mult} -> {Adf} kHz", et.Knob, dir, mult, adf);
                 break;
 
             case RadioMode.Xpdr:
                 if (et.Knob == Knob.Inner)
                 {
-                    int code = RadioFormat.AdjustSquawk(RadioFormat.BcdToCode(snap.TransponderCode), dir * mult);
+                    // Exactly one squawk step per detent — a discrete code must never accelerate/skip.
+                    int current = RadioFormat.BcdToCode(snap.TransponderCode);
+                    int code = RadioFormat.AdjustSquawk(current, dir);
                     _sim.SetTransponder(code);
-                    // optimistic: re-encode to BCD for the local snapshot
-                    snap.TransponderCode = ToBcd(code);
+                    snap.TransponderCode = ToBcd(code); // optimistic BCO16 for the local snapshot
+                    _log.LogDebug("Squawk dir {Dir}: {Current:0000} -> {Code:0000}", dir, current, code);
                 }
                 else
                 {
                     double mb = Clamp(RadioFormat.SnapToGrid(snap.KohlsmanMb + dir * mult, 1), 900, 1100);
                     snap.KohlsmanMb = mb;
                     _sim.SetKohlsmanMb(mb);
+                    _log.LogDebug("QNH dir {Dir} x{Mult} -> {Mb} hPa", dir, mult, mb);
                 }
                 break;
 
@@ -196,33 +202,72 @@ public sealed class RadioPanelController : IDisposable
             default: snap.Nav2Standby = next; break;
         }
         _sim.SetStandbyMHz(m, next);
+        _log.LogDebug("Tune {Mode} STBY {Knob} dir {Dir} x{Mult} -> {Next:000.000} MHz", m, knob, dir, mult, next);
     }
 
-    private void HandleButtonRelease(PanelRow row)
+    // Long-press fires on its own after LongPressMs while the button is still held (not on release).
+    private void StartLongPressTimer(PanelRow row)
     {
+        lock (_gate)
+        {
+            _longFired.Remove(row);
+            if (_longPressTimers.TryGetValue(row, out var existing))
+                existing.Dispose();
+            _longPressTimers[row] = _time.CreateTimer(
+                _ => OnLongPress(row), null, TimeSpan.FromMilliseconds(_config.LongPressMs), Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void CancelLongPressTimer(PanelRow row)
+    {
+        lock (_gate)
+        {
+            if (_longPressTimers.TryGetValue(row, out var t))
+            {
+                t.Dispose();
+                _longPressTimers.Remove(row);
+            }
+        }
+    }
+
+    private void OnLongPress(PanelRow row)
+    {
+        lock (_gate)
+            _longFired.Add(row);
+
         var mode = ModeFor(row);
         if (mode is not RadioMode m)
             return;
 
-        bool longPress = false;
-        if (_buttonDownAt.TryGetValue(row, out long downAt))
+        if (m == RadioMode.Xpdr)
         {
-            longPress = _time.GetElapsedTime(downAt).TotalMilliseconds >= _config.LongPressMs;
-            _buttonDownAt.Remove(row);
+            _sim.SetBaroStandard();
+            _log.LogInformation("Long-press {Row}: set standard pressure (STD).", row);
+            RefreshDisplays();
         }
+        // Other modes have no long-press action.
+    }
 
-        switch (m)
+    private void HandleButtonRelease(PanelRow row)
+    {
+        CancelLongPressTimer(row);
+
+        bool longAlreadyFired;
+        lock (_gate)
+            longAlreadyFired = _longFired.Remove(row);
+        if (longAlreadyFired)
+            return; // the long-press already did its thing while the button was held
+
+        var mode = ModeFor(row);
+        if (mode is not RadioMode m)
+            return;
+
+        if (m is RadioMode.Com1 or RadioMode.Com2 or RadioMode.Nav1 or RadioMode.Nav2)
         {
-            case RadioMode.Com1 or RadioMode.Com2 or RadioMode.Nav1 or RadioMode.Nav2:
-                _sim.Swap(m); // short or long => swap active/standby
-                break;
-
-            case RadioMode.Xpdr when longPress:
-                _sim.SetBaroStandard();
-                break;
+            _sim.Swap(m);
+            _log.LogInformation("Short-press {Row}: swap {Mode} active/standby.", row, m);
+            RefreshDisplays();
         }
-
-        RefreshDisplays();
     }
 
     private void PlayWelcome()
@@ -234,6 +279,7 @@ public sealed class RadioPanelController : IDisposable
         string lo = new string(' ', 10) + (w.LowerMessage ?? "") + new string(' ', 10);
         int intervalMs = Math.Max(60, 1000 / Math.Max(1, w.Speed));
         _welcomeActive = true;
+        _log.LogInformation("Playing welcome message for {Seconds}s.", w.Time);
 
         _ = Task.Run(async () =>
         {
@@ -328,5 +374,12 @@ public sealed class RadioPanelController : IDisposable
         _panel.Event -= OnPanelEvent;
         _panel.ConnectionChanged -= OnPanelConnectionChanged;
         _sim.DataUpdated -= OnSimData;
+
+        lock (_gate)
+        {
+            foreach (var t in _longPressTimers.Values)
+                t.Dispose();
+            _longPressTimers.Clear();
+        }
     }
 }
