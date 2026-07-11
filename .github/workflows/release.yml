@@ -1,0 +1,42 @@
+name: release
+
+# Publishes a self-contained win-x64 build and attaches the zip to a GitHub Release.
+# Trigger by pushing a version tag, e.g.:  git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Publish (self-contained win-x64)
+        run: >
+          dotnet publish CustomRadioPanel.App/CustomRadioPanel.App.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:WindowsPackageType=None
+          -o publish
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath CustomRadioPanel-${{ github.ref_name }}-win-x64.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: CustomRadioPanel-${{ github.ref_name }}-win-x64.zip
+          generate_release_notes: true

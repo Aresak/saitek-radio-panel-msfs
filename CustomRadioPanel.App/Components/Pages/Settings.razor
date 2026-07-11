@@ -1,0 +1,74 @@
+@page "/settings"
+@inject ConfigService ConfigService
+@inject RadioPanelController Controller
+
+<PageTitle>Settings</PageTitle>
+
+<div class="screen">
+    <div class="scroll" style="flex:1; display:flex; flex-direction:column; gap:14px;">
+        <div class="card">
+            <h2>Knob feel</h2>
+            <label class="check">
+                <input type="checkbox" @bind="_cfg.Encoder.AccelerationEnabled" />
+                Acceleration — fast spin makes bigger steps
+            </label>
+            <div class="grid2">
+                <label>Global step scale<input type="number" step="0.1" min="0.1" max="10" @bind="_cfg.Encoder.GlobalStepScale" /></label>
+                <label>Medium ×<input type="number" min="1" @bind="_cfg.Encoder.MediumMultiplier" /></label>
+                <label>Fast ×<input type="number" min="1" @bind="_cfg.Encoder.FastMultiplier" /></label>
+                <label>Medium threshold (ms)<input type="number" min="1" @bind="_cfg.Encoder.MediumThresholdMs" /></label>
+                <label>Fast threshold (ms)<input type="number" min="1" @bind="_cfg.Encoder.FastThresholdMs" /></label>
+                <label>Long-press (ms)<input type="number" min="100" @bind="_cfg.LongPressMs" /></label>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Display</h2>
+            <label class="check">
+                <input type="checkbox" @bind="_cfg.Display.Com833Spacing" />
+                8.33 kHz COM spacing (inner knob = 5 kHz)
+            </label>
+            <label class="check">
+                <input type="checkbox" @bind="_cfg.Display.HideHundredsDigit" />
+                Hide leading digit — 123.405 → 23.405 (VATSIM)
+            </label>
+            <label class="check">
+                <input type="checkbox" @bind="_cfg.Display.BlankStandbyWhenEqual" />
+                Blank standby when it equals active
+            </label>
+        </div>
+
+        <div class="card">
+            <h2>Welcome message</h2>
+            <label class="check">
+                <input type="checkbox" @bind="_cfg.Welcome.Enabled" />
+                Show scrolling welcome at startup
+            </label>
+            <div class="grid2">
+                <label>Upper line<input @bind="_cfg.Welcome.UpperMessage" /></label>
+                <label>Lower line<input @bind="_cfg.Welcome.LowerMessage" /></label>
+                <label>Speed (shifts/sec)<input type="number" min="1" @bind="_cfg.Welcome.Speed" /></label>
+                <label>Duration (seconds)<input type="number" min="1" @bind="_cfg.Welcome.Time" /></label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row-actions">
+        <button class="btn no-drag" @onclick="Save">Save &amp; apply</button>
+        @if (_saved) { <span class="saved">Saved &#10003;</span> }
+    </div>
+    <span class="muted">Saved to @ConfigService.FilePath</span>
+</div>
+
+@code {
+    private AppConfig _cfg = new();
+    private bool _saved;
+
+    protected override void OnInitialized() => _cfg = ConfigService.Load();
+
+    private void Save()
+    {
+        Controller.ApplyConfig(_cfg);
+        _saved = true;
+    }
+}

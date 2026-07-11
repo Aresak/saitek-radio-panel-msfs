@@ -1,0 +1,30 @@
+<div class="radio-row">
+    <div class="row-head">
+        <span class="row-title">@Title</span>
+        <span class="row-mode">@(Mode?.ToString().ToUpperInvariant() ?? "—")</span>
+    </div>
+    <div class="displays">
+        <div class="disp-col">
+            <div class="seg">@Pad(Left)</div>
+            <span class="cap">ACTIVE</span>
+        </div>
+        <div class="disp-col">
+            <div class="seg">@Pad(Right)</div>
+            <span class="cap">STANDBY</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public RadioMode? Mode { get; set; }
+    [Parameter] public string Left { get; set; } = "";
+    [Parameter] public string Right { get; set; } = "";
+
+    private static string Pad(string? s)
+    {
+        s ??= "";
+        int cells = s.Count(c => c != '.');
+        return cells >= 5 ? s : new string(' ', 5 - cells) + s;
+    }
+}

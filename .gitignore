@@ -1,0 +1,20 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+publish/
+*.binlog
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Proprietary — never commit. SimConnect.dll ships with MSFS and is located at runtime.
+libs/*.dll
+
+# Local temp
+_sctest/
+*.log

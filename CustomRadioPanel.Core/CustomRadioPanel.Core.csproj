@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HidSharp" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <!-- SimConnect is called via P/Invoke against the native x64 SimConnect.dll, which is resolved at
+       RUNTIME (SimConnectLocator) from the user's MSFS install — so nothing proprietary is needed to
+       build, and the app never redistributes it. If a copy happens to sit in ../libs (handy for local
+       dev) it is copied next to the app, where the resolver also looks first. -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\libs\SimConnect.dll')">
+    <None Include="..\libs\SimConnect.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>SimConnect.dll</Link>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,141 @@
+@page "/"
+@implements IDisposable
+@inject RadioPanelController Controller
+@inject RadioPanelDevice Panel
+@inject ISimConnectService Sim
+
+<PageTitle>Radio Panel</PageTitle>
+
+<div class="screen dash">
+    <div class="device">
+        <div class="dev-selectors">
+            @foreach (var row in Rows)
+            {
+                var mode = row == PanelRow.Top ? Controller.TopMode : Controller.BottomMode;
+                <div class="selector">
+                    <div class="knob"></div>
+                    <div class="pointer" style="transform: rotate(@(PointerDeg(mode))deg)"></div>
+                    @for (int i = 0; i < 7; i++)
+                    {
+                        var p = Pos(i);
+                        <span class="pos @(mode == (RadioMode)i ? "active" : "")"
+                              style="transform: translate(calc(-50% + @(p.x)px), calc(-50% + @(p.y)px));">@Labels[i]</span>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="dev-displays">
+            <div class="disp-caps"><span>ACTIVE</span><span>STANDBY</span></div>
+            <div class="disp-row">
+                <input class="seg disp-input" @bind="_tl" @bind:event="oninput" @bind:after="() => OnEdit(PanelRow.Top, false, _tl)" @onfocus="StartEdit" @onblur="EndEdit" maxlength="7" />
+                <input class="seg disp-input" @bind="_tr" @bind:event="oninput" @bind:after="() => OnEdit(PanelRow.Top, true, _tr)" @onfocus="StartEdit" @onblur="EndEdit" maxlength="7" />
+            </div>
+            <div class="disp-row">
+                <input class="seg disp-input" @bind="_bl" @bind:event="oninput" @bind:after="() => OnEdit(PanelRow.Bottom, false, _bl)" @onfocus="StartEdit" @onblur="EndEdit" maxlength="7" />
+                <input class="seg disp-input" @bind="_br" @bind:event="oninput" @bind:after="() => OnEdit(PanelRow.Bottom, true, _br)" @onfocus="StartEdit" @onblur="EndEdit" maxlength="7" />
+            </div>
+        </div>
+
+        <div class="dev-knobs">
+            @foreach (var row in Rows)
+            {
+                <div class="knob-unit no-drag" title="Swap active / standby" @onclick="() => SwapRow(row)">
+                    <div class="big-knob"></div>
+                    <div class="toggle-lbl"><b>ACT/STBY</b>XPDR&nbsp;DIGIT</div>
+                </div>
+            }
+        </div>
+
+        <span class="brand">Saitek</span>
+    </div>
+
+    @if (!Controller.SimConnected)
+    {
+        <div class="hint">Waiting for MSFS — start the sim and load a flight. You can still edit the displays.</div>
+    }
+</div>
+
+@code {
+    private static readonly PanelRow[] Rows = { PanelRow.Top, PanelRow.Bottom };
+    private static readonly string[] Labels = { "COM1", "COM2", "NAV1", "NAV2", "ADF", "DME", "XPDR" };
+
+    private string _tl = "", _tr = "", _bl = "", _br = "";
+    private bool _editing;
+
+    protected override void OnInitialized()
+    {
+        Controller.StateChanged += OnStateChanged;
+        SyncFromLive();
+    }
+
+    private void OnStateChanged()
+    {
+        SyncFromLive();
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Mirror the live sim/controller values into the inputs — unless the user is currently editing.
+    private void SyncFromLive()
+    {
+        if (_editing)
+            return;
+        _tl = Controller.TopLeft;
+        _tr = Controller.TopRight;
+        _bl = Controller.BottomLeft;
+        _br = Controller.BottomRight;
+    }
+
+    private void StartEdit() => _editing = true;
+    private void EndEdit() => _editing = false;
+
+    private (int x, int y) Pos(int i)
+    {
+        double deg = -90 + i * (360.0 / 7);
+        double rad = deg * Math.PI / 180.0;
+        return ((int)Math.Round(Math.Cos(rad) * 40), (int)Math.Round(Math.Sin(rad) * 40));
+    }
+
+    // Integer degrees on purpose: a double would be written with the OS decimal separator (a comma in
+    // some locales), which is invalid in CSS transform:rotate() and silently ignored.
+    private int PointerDeg(RadioMode? mode) => mode is RadioMode m ? (int)Math.Round((int)m * (360.0 / 7)) : 0;
+
+    // Clicking the ACT/STBY toggle swaps active/standby for a COM/NAV radio (like the physical switch).
+    private void SwapRow(PanelRow row)
+    {
+        var mode = row == PanelRow.Top ? Controller.TopMode : Controller.BottomMode;
+        if (mode is RadioMode m and (RadioMode.Com1 or RadioMode.Com2 or RadioMode.Nav1 or RadioMode.Nav2))
+            Sim.Swap(m);
+    }
+
+    // Editing a display lights the hardware panel and writes the value to the sim for the radio the
+    // row's selector is on. COM/NAV parse as MHz (value < 100 assumed missing the leading '1'); ADF as kHz.
+    private void OnEdit(PanelRow row, bool standby, string value)
+    {
+        Panel.SetDisplay(SevenSegment.BuildBuffer(_tl, _tr, _bl, _br));
+
+        if (!Sim.IsConnected)
+            return;
+
+        var mode = row == PanelRow.Top ? Controller.TopMode : Controller.BottomMode;
+        if (mode is not RadioMode m)
+            return;
+
+        if (!double.TryParse(value.Replace(',', '.'), System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out double v) || v <= 0)
+            return;
+
+        switch (m)
+        {
+            case RadioMode.Com1 or RadioMode.Com2 or RadioMode.Nav1 or RadioMode.Nav2:
+                if (v < 100) v += 100;
+                if (standby) Sim.SetStandbyMHz(m, v); else Sim.SetActiveMHz(m, v);
+                break;
+            case RadioMode.Adf:
+                Sim.SetAdfKHz(1, v);
+                break;
+        }
+    }
+
+    public void Dispose() => Controller.StateChanged -= OnStateChanged;
+}

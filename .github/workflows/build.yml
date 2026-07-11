@@ -1,0 +1,28 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Test
+        run: dotnet test CustomRadioPanel.Tests/CustomRadioPanel.Tests.csproj -c Release
+
+      - name: Build app
+        run: dotnet build CustomRadioPanel.App/CustomRadioPanel.App.csproj -c Release

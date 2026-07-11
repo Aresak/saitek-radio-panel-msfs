@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="CustomRadioPanel.App/CustomRadioPanel.App.csproj" />
+  <Project Path="CustomRadioPanel.Core/CustomRadioPanel.Core.csproj" />
+  <Project Path="CustomRadioPanel.Tests/CustomRadioPanel.Tests.csproj" />
+</Solution>

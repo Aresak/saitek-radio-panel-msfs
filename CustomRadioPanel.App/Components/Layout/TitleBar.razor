@@ -1,0 +1,69 @@
+@implements IDisposable
+@inject IJSRuntime JS
+@inject IWindowControl Window
+@inject NavigationManager Nav
+@inject RadioPanelController Controller
+
+<div class="titlebar" @ref="_bar">
+    <span class="title">@Title</span>
+    <div class="tb-right no-drag">
+        <div class="status">
+            <span class="s-dot @(Controller.PanelConnected ? "on" : "")">Panel</span>
+            <span class="s-dot @(Controller.SimConnected ? "on" : "")">MSFS</span>
+        </div>
+        @if (_page.Length == 0)
+        {
+            <button class="win-btn" title="Settings" @onclick="OpenSettings">&#9881;</button>
+        }
+        else
+        {
+            <button class="win-btn" title="Back" @onclick="GoHome">&#8592;</button>
+        }
+        <button class="win-btn" title="Minimize" @onclick="() => Window.Minimize()">&#8211;</button>
+        <button class="win-btn close" title="Close" @onclick="() => Window.Close()">&#10005;</button>
+    </div>
+</div>
+
+@code {
+    private ElementReference _bar;
+    private string _page = "";
+
+    private string Title => _page switch
+    {
+        "settings" => "Settings",
+        "monitor" => "Panel debug",
+        _ => "Radio Panel",
+    };
+
+    protected override void OnInitialized()
+    {
+        UpdatePage();
+        Nav.LocationChanged += OnLocationChanged;
+        Controller.StateChanged += OnStateChanged;
+    }
+
+    private void UpdatePage() => _page = Nav.ToBaseRelativePath(Nav.Uri).Trim('/');
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdatePage();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    private void OpenSettings() => Nav.NavigateTo("settings");
+    private void GoHome() => Nav.NavigateTo("/");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("crpDrag.attach", _bar);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        Controller.StateChanged -= OnStateChanged;
+    }
+}
