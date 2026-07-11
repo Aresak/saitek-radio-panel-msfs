@@ -51,6 +51,15 @@
                 <label>Duration (seconds)<input type="number" min="1" @bind="_cfg.Welcome.Time" /></label>
             </div>
         </div>
+
+        <div class="card">
+            <h2>Logs</h2>
+            <p class="muted" style="margin:0 0 8px">For bug reports, attach the newest log file from this folder:</p>
+            <code style="font-family:Consolas,monospace; color:var(--muted); word-break:break-all;">@AppLogging.LogsDirectory</code>
+            <div style="margin-top:10px">
+                <button class="btn ghost no-drag" @onclick="OpenLogs">Open logs folder</button>
+            </div>
+        </div>
     </div>
 
     <div class="row-actions">
@@ -65,6 +74,15 @@
     private bool _saved;
 
     protected override void OnInitialized() => _cfg = ConfigService.Load();
+
+    private void OpenLogs()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{AppLogging.LogsDirectory}\"") { UseShellExecute = true });
+        }
+        catch { /* ignore */ }
+    }
 
     private void Save()
     {

@@ -4,6 +4,7 @@ using CustomRadioPanel.Core.Logic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
+using Serilog;
 
 namespace CustomRadioPanel.App;
 
@@ -11,6 +12,9 @@ public static class MauiProgram
 {
 	public static MauiApp CreateMauiApp()
 	{
+		// Set up file logging first so even early startup errors are captured.
+		AppLogging.Initialize();
+
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
@@ -18,6 +22,8 @@ public static class MauiProgram
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 			});
+
+		builder.Logging.AddSerilog(dispose: true);
 
 		builder.Services.AddMauiBlazorWebView();
 		builder.Services.AddRadioPanel();

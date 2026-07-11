@@ -112,6 +112,18 @@ bundled). Nothing from `libs/` is required or shipped.
   .NET-Framework mixed-mode assembly .NET 10 can't load). Frequencies are set with the `*_SET_HZ`
   key events (SimVar writes are ignored by MSFS).
 
+## Reporting issues
+
+Found a bug? Please [open an issue](../../issues) and **attach the log file** — it makes diagnosis far
+easier. The app writes rolling logs to:
+
+```
+%AppData%\CustomRadioPanel\logs\radiopanel-<date>.log
+```
+
+The quickest way there: **Settings → Logs → Open logs folder** in the app. Attach the newest
+`radiopanel-*.log` and say what you were doing, which aircraft, and whether the panel and MSFS were connected.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Not affiliated with Microsoft, Logitech or Saitek. "SimConnect" is a
