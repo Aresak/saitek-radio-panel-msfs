@@ -14,6 +14,12 @@ the two 5-digit displays, and talks to the sim over SimConnect — no paid softw
 
 ---
 
+## Screenshots
+
+| Dashboard | Settings |
+|:---:|:---:|
+| ![Dashboard — the panel replica with live, editable displays](docs/images/dashboard.png) | ![Settings — knob feel, display and welcome message](docs/images/settings.png) |
+
 ## Features
 
 - **Both rows** (upper / lower), full selector: `COM1 COM2 NAV1 NAV2 ADF DME XPDR`.
