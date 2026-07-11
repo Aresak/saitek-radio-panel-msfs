@@ -245,10 +245,11 @@ public sealed class RadioPanelController : IDisposable
                 {
                     var (ul, ur) = Split(up, pos);
                     var (ll, lr) = Split(lo, pos);
+                    // UI-only: the panel's 7-seg font is digits-only, so text can't render on the
+                    // hardware. We update the on-screen displays and leave the physical panel clear.
                     lock (_gate)
                     {
                         TopLeft = ul; TopRight = ur; BottomLeft = ll; BottomRight = lr;
-                        _panel.SetDisplay(SevenSegment.BuildBuffer(ul, ur, ll, lr));
                     }
                     RaiseState();
                     pos++;
