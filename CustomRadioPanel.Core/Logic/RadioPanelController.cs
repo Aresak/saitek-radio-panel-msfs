@@ -152,12 +152,13 @@ public sealed class RadioPanelController : IDisposable
             case RadioMode.Xpdr:
                 if (et.Knob == Knob.Inner)
                 {
-                    // Exactly one squawk step per detent — a discrete code must never accelerate/skip.
+                    // Fast spins accelerate; slow turns move one code at a time. (The old "skipping"
+                    // was a wrong SimVar unit, not acceleration — fixed by reading BCO16.)
                     int current = RadioFormat.BcdToCode(snap.TransponderCode);
-                    int code = RadioFormat.AdjustSquawk(current, dir);
+                    int code = RadioFormat.AdjustSquawk(current, dir * mult);
                     _sim.SetTransponder(code);
                     snap.TransponderCode = ToBcd(code); // optimistic BCO16 for the local snapshot
-                    _log.LogDebug("Squawk dir {Dir}: {Current:0000} -> {Code:0000}", dir, current, code);
+                    _log.LogDebug("Squawk dir {Dir} x{Mult}: {Current:0000} -> {Code:0000}", dir, mult, current, code);
                 }
                 else
                 {
